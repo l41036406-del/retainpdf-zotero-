@@ -4,3 +4,6 @@ build/
 .scaffold
 reference-zotero-pdf2zh/
 reference-retain-pdf/
+reference-zotero-pdf-translate/
+.runtime-test/
+.engine-staging/

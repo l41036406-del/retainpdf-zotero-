@@ -1,0 +1,10 @@
+--- a/backend/rust_api/Cargo.toml
++++ b/backend/rust_api/Cargo.toml
+@@
+-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart"] }
++reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls", "stream", "multipart"] }
+--- a/backend/rust_api/src/ocr_provider/paddle/client.rs
++++ b/backend/rust_api/src/ocr_provider/paddle/client.rs
+@@
+-        .no_proxy()
+         .build()

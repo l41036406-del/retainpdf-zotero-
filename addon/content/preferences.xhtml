@@ -1,0 +1,52 @@
+<groupbox onload="Zotero.__addonInstance__.hooks.onPreferencesLoad(window);">
+  <html:style>
+    #retainpdf-v2-settings { max-width: 760px; }
+    #retainpdf-v2-settings h3 { margin: 8px 0 4px; }
+    #retainpdf-v2-settings .hint { color: var(--fill-secondary, #666); font-size: 0.92em; }
+    #retainpdf-v2-settings input, #retainpdf-v2-settings select { min-width: 320px; }
+  </html:style>
+  <vbox id="retainpdf-v2-settings" flex="1">
+    <html:h2>RetainPDF 翻译</html:h2>
+    <html:p class="hint">所有凭证仅保存在本机 Zotero 配置中；无需使用高级设置编辑器。</html:p>
+
+    <html:h3>OCR 服务</html:h3>
+    <html:label for="retainpdf-paddle-token">Paddle API Token</html:label>
+    <html:input id="retainpdf-paddle-token" preference="extensions.zotero.retainpdfzotero.paddleToken" type="password" placeholder="从 PaddleOCR 服务获取的 Token" />
+    <html:p class="hint">用于 PDF 版面识别和公式/图片提取。留空时才兼容读取旧版高级设置中的 Token。</html:p>
+
+    <html:h3>AI 翻译服务</html:h3>
+    <html:label for="retainpdf-ai-base-url">兼容 OpenAI 的接口地址</html:label>
+    <html:input id="retainpdf-ai-base-url" preference="extensions.zotero.retainpdfzotero.aiBaseURL" type="url" placeholder="https://api.deepseek.com/v1" />
+    <html:label for="retainpdf-ai-model">模型名称</html:label>
+    <html:input id="retainpdf-ai-model" preference="extensions.zotero.retainpdfzotero.aiModel" type="text" placeholder="deepseek-v4-flash" />
+    <html:label for="retainpdf-ai-key">API Key</html:label>
+    <html:input id="retainpdf-ai-key" preference="extensions.zotero.retainpdfzotero.aiAPIKey" type="password" placeholder="仅保存在本机 Zotero 配置中" />
+    <html:label for="retainpdf-target-language">目标语言</html:label>
+    <html:select id="retainpdf-target-language" preference="extensions.zotero.retainpdfzotero.targetLanguage">
+      <html:option value="zh">简体中文</html:option>
+      <html:option value="en">English</html:option>
+      <html:option value="ja">日本語</html:option>
+      <html:option value="ko">한국어</html:option>
+    </html:select>
+
+    <html:h3>本地翻译引擎</html:h3>
+    <html:label for="retainpdf-engine-mode">运行模式</html:label>
+    <html:select id="retainpdf-engine-mode" preference="extensions.zotero.retainpdfzotero.engineMode">
+      <html:option value="desktop">兼容模式：已安装的 RetainPDF 桌面引擎</html:option>
+      <html:option value="bundled">内置本地引擎（无需桌面版）</html:option>
+    </html:select>
+    <html:button id="retainpdf-install-engine">安装/检查内置本地引擎</html:button>
+    <html:p id="retainpdf-engine-status" class="hint">正在检查内置本地引擎…</html:p>
+    <html:p class="hint">首次安装会下载约 165 MB 的 Windows 引擎包，解压后完全在本机运行；以后翻译无需打开 RetainPDF 桌面版。</html:p>
+
+    <html:h3>任务默认值</html:h3>
+    <html:label for="retainpdf-page-ranges">页码范围（留空为全文）</html:label>
+    <html:input id="retainpdf-page-ranges" preference="extensions.zotero.retainpdfzotero.pageRanges" type="text" placeholder="例如：1-5,8" />
+    <html:label for="retainpdf-max-concurrency">并发任务数</html:label>
+    <html:select id="retainpdf-max-concurrency" preference="extensions.zotero.retainpdfzotero.maxConcurrency">
+      <html:option value="1">1（推荐）</html:option>
+      <html:option value="2">2</html:option>
+    </html:select>
+    <html:p class="hint">翻译过程会显示“准备、上传、解析/OCR、翻译、渲染、写入 Zotero”等进度。默认单任务可避免 API 限流。</html:p>
+  </vbox>
+</groupbox>

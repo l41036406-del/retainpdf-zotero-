@@ -1,4 +1,7 @@
 import { RetainPDFClient, OutputKind } from "./retainpdf";
+import { TranslationProgressWindow } from "./progress";
+import { LocalEngineManager } from "./localEngine";
+import { config } from "../package.json";
 
 const MENU_ID = "zotero-itemmenu-retainpdf-zotero";
 
@@ -8,21 +11,33 @@ function selectedItems(): Zotero.Item[] {
     return pane?.getSelectedItems?.() || [];
 }
 
+function engineMode(): string {
+    return String(Zotero.Prefs.get(`${config.prefsPrefix}.engineMode`, true) || "desktop");
+}
+
 async function run(kind: OutputKind) {
+    const progress = new TranslationProgressWindow();
     try {
         const items = selectedItems();
         if (!items.length) {
             throw new Error("请先选择一个文献条目或 PDF 附件。");
         }
-        const client = new RetainPDFClient();
-        for (const item of items) await client.translateAndAttach(item, kind);
-        Services.prompt.alert(
-            Zotero.getMainWindow() as unknown as mozIDOMWindowProxy,
-            "RetainPDF",
-            "任务已提交。翻译完成后会自动作为子附件添加到原文献。",
-        );
+        let client: RetainPDFClient;
+        if (engineMode() === "bundled") {
+            progress.report("准备", "启动内置本地引擎", 3);
+            const engine = await new LocalEngineManager().ensureReady();
+            client = new RetainPDFClient(engine);
+        } else {
+            client = new RetainPDFClient();
+        }
+        for (let index = 0; index < items.length; index++) {
+            progress.report("准备", `队列任务 ${index + 1}/${items.length}`, 0);
+            await client.translateAndAttach(items[index], kind, progress.report);
+        }
+        progress.succeed("翻译完成，PDF 已写入 Zotero");
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        progress.fail(message);
         Services.prompt.alert(
             Zotero.getMainWindow() as unknown as mozIDOMWindowProxy,
             "RetainPDF 翻译失败",
@@ -49,13 +64,71 @@ function addMenu(win: Window) {
     itemMenu.appendChild(menu);
 }
 
+function registerPreferences() {
+    const addon = (Zotero as any)[config.addonInstance];
+    if (!addon?.rootURI) return;
+    Zotero.PreferencePanes.register({
+        pluginID: config.addonID,
+        src: `${addon.rootURI}content/preferences.xhtml`,
+        label: "RetainPDF 翻译",
+    });
+}
+
+async function refreshEngineStatus(win: Window) {
+    const status = await new LocalEngineManager().status();
+    const label = win.document.getElementById("retainpdf-engine-status");
+    if (label) label.textContent = status.ready ? "内置本地引擎已就绪。" : status.reason;
+}
+
 export default {
     async onStartup() {
         await Promise.all([Zotero.initializationPromise, Zotero.uiReadyPromise]);
+        registerPreferences();
         Zotero.getMainWindows().forEach(addMenu);
     },
     onMainWindowLoad: addMenu,
     onMainWindowUnload() {},
+    onPreferencesLoad(win: Window) {
+        const settings: Array<[string, string, string]> = [
+            ["retainpdf-paddle-token", "paddleToken", ""],
+            ["retainpdf-ai-base-url", "aiBaseURL", ""],
+            ["retainpdf-ai-model", "aiModel", ""],
+            ["retainpdf-ai-key", "aiAPIKey", ""],
+            ["retainpdf-target-language", "targetLanguage", "zh"],
+            ["retainpdf-engine-mode", "engineMode", "desktop"],
+            ["retainpdf-page-ranges", "pageRanges", ""],
+            ["retainpdf-max-concurrency", "maxConcurrency", "1"],
+        ];
+        for (const [id, name, fallback] of settings) {
+            const input = win.document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+            if (!input) continue;
+            if (!input.dataset.retainpdfBound) {
+                input.value = String(Zotero.Prefs.get(`${config.prefsPrefix}.${name}`, true) || fallback);
+                input.dataset.retainpdfBound = "true";
+                input.addEventListener("change", () => Zotero.Prefs.set(`${config.prefsPrefix}.${name}`, input.value, true));
+            }
+        }
+        void refreshEngineStatus(win);
+        const button = win.document.getElementById("retainpdf-install-engine") as HTMLButtonElement | null;
+        if (!button || button.dataset.retainpdfBound) return;
+        button.dataset.retainpdfBound = "true";
+        button.addEventListener("click", () => void (async () => {
+            button.disabled = true;
+            button.textContent = "正在安装本地引擎…";
+            try {
+                await new LocalEngineManager().ensureReady();
+                Zotero.Prefs.set(`${config.prefsPrefix}.engineMode`, "bundled", true);
+                await refreshEngineStatus(win);
+                button.textContent = "内置本地引擎已安装";
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                const label = win.document.getElementById("retainpdf-engine-status");
+                if (label) label.textContent = `安装失败：${message}`;
+                button.textContent = "重试安装内置本地引擎";
+                button.disabled = false;
+            }
+        })());
+    },
     onShutdown() {
         Zotero.getMainWindows().forEach((win) => win.document.getElementById(MENU_ID)?.remove());
         delete (Zotero as any).retainPDFZotero;
