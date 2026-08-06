@@ -16,9 +16,10 @@ const ENGINE_PORT = 41001;
 const ENGINE_SIMPLE_PORT = 42001;
 const ENGINE_AI_PORT = 41101;
 const ENGINE_API_KEY = "retainpdf-zotero-local";
+const ENGINE_VERSION = "2.0.0-alpha.4";
 // Alpha builds must use an explicit release tag so stable users never download
 // a preview engine through the `latest` release alias.
-const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/retainpdf-zotero-/releases/download/v2.0.0-alpha.3/retainpdf-zotero-engine-win32.zip";
+const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/retainpdf-zotero-/releases/download/v2.0.0-alpha.4/retainpdf-zotero-engine-win32.zip";
 
 export type LocalEngineStatus =
     | { ready: true; baseURL: string }
@@ -59,7 +60,19 @@ export class LocalEngineManager {
         return PathUtils.join(PathUtils.tempDir, "retainpdf-zotero-engine-win32.zip");
     }
 
+    private get versionPath() {
+        return PathUtils.join(this.runtimeRoot, ".retainpdf-zotero-engine-version");
+    }
+
+    private async needsInstall(): Promise<boolean> {
+        if (!await IOUtils.exists(this.executable) || !await IOUtils.exists(this.versionPath)) return true;
+        return (await IOUtils.readUTF8(this.versionPath)).trim() !== ENGINE_VERSION;
+    }
+
     async status(): Promise<LocalEngineStatus> {
+        if (await this.needsInstall()) {
+            return { ready: false, reason: "内置本地引擎需要更新。" };
+        }
         if (!await IOUtils.exists(this.executable)) {
             return { ready: false, reason: "未安装内置本地引擎。" };
         }
@@ -77,7 +90,7 @@ export class LocalEngineManager {
     async ensureReady(): Promise<{ baseURL: string; apiKey: string }> {
         const current = await this.status();
         if (current.ready) return { baseURL: current.baseURL, apiKey: this.apiKey };
-        if (!await IOUtils.exists(this.executable)) await this.install();
+        if (await this.needsInstall()) await this.install();
         if (!this.starting) this.starting = this.start();
         await this.starting;
         return { baseURL: this.baseURL, apiKey: this.apiKey };
@@ -142,6 +155,13 @@ export class LocalEngineManager {
         }
         await IOUtils.write(this.archivePath, new Uint8Array(await response.arrayBuffer()));
         try {
+            if (await IOUtils.exists(this.runtimeRoot)) {
+                try {
+                    await IOUtils.remove(this.runtimeRoot, { recursive: true });
+                } catch (_error) {
+                    throw new Error("无法替换旧引擎。请先关闭旧引擎的终端窗口，再点击此按钮重试。");
+                }
+            }
             await IOUtils.makeDirectory(this.runtimeRoot, { ignoreExisting: true });
             const classes = Components.classes as any;
             const file = classes["@mozilla.org/file/local;1"].createInstance(Components.interfaces.nsIFile);
@@ -176,5 +196,6 @@ export class LocalEngineManager {
         if (!await IOUtils.exists(this.executable)) {
             throw new Error("内置本地引擎安装不完整，未找到 Rust API。请重新安装。 ");
         }
+        await IOUtils.writeUTF8(this.versionPath, ENGINE_VERSION);
     }
 }

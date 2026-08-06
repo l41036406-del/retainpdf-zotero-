@@ -1,6 +1,6 @@
 {
   "name": "retainpdf-zotero",
-  "version": "2.0.0-alpha.3",
+  "version": "2.0.0-alpha.4",
   "description": "A minimal Zotero 9 bridge for the local RetainPDF service.",
   "config": {
     "addonName": "RetainPDF for Zotero",
