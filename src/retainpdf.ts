@@ -34,9 +34,14 @@ function pref(name: keyof typeof defaults): string {
 function sleep(ms: number) { return new Promise<void>((resolve) => setTimeout(resolve, ms)); }
 
 export class RetainPDFClient {
-    private baseURL = pref("baseURL").replace(/\/$/, "");
-    private apiKey = pref("apiKey");
+    private baseURL: string;
+    private apiKey: string;
     private desktopExePath = pref("desktopExePath");
+
+    constructor(endpoint?: { baseURL: string; apiKey: string }) {
+        this.baseURL = (endpoint?.baseURL || pref("baseURL")).replace(/\/$/, "");
+        this.apiKey = endpoint?.apiKey || pref("apiKey");
+    }
 
     private get effectiveApiKey(): string {
         // The official desktop app exposes its loopback Rust API with this key.

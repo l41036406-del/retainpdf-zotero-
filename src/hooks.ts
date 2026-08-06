@@ -1,5 +1,6 @@
 import { RetainPDFClient, OutputKind } from "./retainpdf";
 import { TranslationProgressWindow } from "./progress";
+import { LocalEngineManager } from "./localEngine";
 import { config } from "../package.json";
 
 const MENU_ID = "zotero-itemmenu-retainpdf-zotero";
@@ -10,6 +11,10 @@ function selectedItems(): Zotero.Item[] {
     return pane?.getSelectedItems?.() || [];
 }
 
+function engineMode(): string {
+    return String(Zotero.Prefs.get(`${config.prefsPrefix}.engineMode`, true) || "desktop");
+}
+
 async function run(kind: OutputKind) {
     const progress = new TranslationProgressWindow();
     try {
@@ -17,7 +22,14 @@ async function run(kind: OutputKind) {
         if (!items.length) {
             throw new Error("请先选择一个文献条目或 PDF 附件。");
         }
-        const client = new RetainPDFClient();
+        let client: RetainPDFClient;
+        if (engineMode() === "bundled") {
+            progress.report("准备", "启动内置本地引擎", 3);
+            const engine = await new LocalEngineManager().ensureReady();
+            client = new RetainPDFClient(engine);
+        } else {
+            client = new RetainPDFClient();
+        }
         for (let index = 0; index < items.length; index++) {
             progress.report("准备", `队列任务 ${index + 1}/${items.length}`, 0);
             await client.translateAndAttach(items[index], kind, progress.report);
