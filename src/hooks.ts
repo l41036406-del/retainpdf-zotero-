@@ -3,17 +3,32 @@ import { RetainPDFClient, OutputKind } from "./retainpdf";
 const MENU_ID = "zotero-itemmenu-retainpdf-zotero";
 
 function selectedItems(): Zotero.Item[] {
-    return (Zotero.getActiveZoteroPane() as any).getSelectedItems();
+    const mainWindow = Zotero.getMainWindow() as any;
+    const pane = mainWindow?.ZoteroPane;
+    return pane?.getSelectedItems?.() || [];
 }
 
 async function run(kind: OutputKind) {
-    const items = selectedItems();
-    if (!items.length) {
-        Services.prompt.alert(Zotero.getMainWindow() as unknown as mozIDOMWindowProxy, "RetainPDF", "请先选择一个文献条目或 PDF 附件。");
-        return;
+    try {
+        const items = selectedItems();
+        if (!items.length) {
+            throw new Error("请先选择一个文献条目或 PDF 附件。");
+        }
+        const client = new RetainPDFClient();
+        for (const item of items) await client.translateAndAttach(item, kind);
+        Services.prompt.alert(
+            Zotero.getMainWindow() as unknown as mozIDOMWindowProxy,
+            "RetainPDF",
+            "任务已提交。翻译完成后会自动作为子附件添加到原文献。",
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        Services.prompt.alert(
+            Zotero.getMainWindow() as unknown as mozIDOMWindowProxy,
+            "RetainPDF 翻译失败",
+            message,
+        );
     }
-    const client = new RetainPDFClient();
-    for (const item of items) await client.translateAndAttach(item, kind);
 }
 
 function addMenu(win: Window) {
