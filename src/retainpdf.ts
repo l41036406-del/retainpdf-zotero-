@@ -28,8 +28,20 @@ export class RetainPDFClient {
     private baseURL = pref("baseURL").replace(/\/$/, "");
     private apiKey = pref("apiKey");
 
+    private get effectiveApiKey(): string {
+        // The official desktop app exposes its loopback Rust API with this key.
+        // Use it directly so a stale/manual preference cannot break desktop use.
+        if (/^http:\/\/(127\.0\.0\.1|localhost):41000$/i.test(this.baseURL)) {
+            return "retain-pdf-desktop";
+        }
+        return this.apiKey;
+    }
+
     private headers(json = true): Record<string, string> {
-        return { ...(json ? { "Content-Type": "application/json" } : {}), ...(this.apiKey ? { "X-API-Key": this.apiKey } : {}) };
+        return {
+            ...(json ? { "Content-Type": "application/json" } : {}),
+            ...(this.effectiveApiKey ? { "X-API-Key": this.effectiveApiKey } : {}),
+        };
     }
 
     private async api<T>(path: string, init: RequestInit = {}): Promise<T> {
