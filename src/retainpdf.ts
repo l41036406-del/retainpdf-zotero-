@@ -51,8 +51,14 @@ export class RetainPDFClient {
         const path = attachment.getFilePath();
         if (!path) throw new Error("PDF 附件文件不存在于本地。");
         const bytes = await IOUtils.read(path);
-        const form = new FormData();
-        form.append("file", new File([bytes.buffer as ArrayBuffer], PathUtils.filename(path), { type: "application/pdf" }));
+        const browserWindow = Zotero.getMainWindow() as any;
+        const form = new browserWindow.FormData();
+        const file = new browserWindow.File(
+            [bytes.buffer as ArrayBuffer],
+            PathUtils.filename(path),
+            { type: "application/pdf" },
+        );
+        form.append("file", file);
         const response = await fetch(`${this.baseURL}/api/v1/uploads`, { method: "POST", headers: this.headers(false), body: form });
         const body = await response.json() as unknown as ApiResponse<{ upload_id: string }>;
         if (!response.ok || body.code !== 0) throw new Error(body.message || "上传 PDF 失败。");
