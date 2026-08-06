@@ -18,7 +18,7 @@ const ENGINE_AI_PORT = 41101;
 const ENGINE_API_KEY = "retainpdf-zotero-local";
 // Alpha builds must use an explicit release tag so stable users never download
 // a preview engine through the `latest` release alias.
-const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/retainpdf-zotero-/releases/download/v2.0.0-alpha.2/retainpdf-zotero-engine-win32.zip";
+const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/retainpdf-zotero-/releases/download/v2.0.0-alpha.3/retainpdf-zotero-engine-win32.zip";
 
 export type LocalEngineStatus =
     | { ready: true; baseURL: string }

@@ -89,6 +89,25 @@ export default {
     onMainWindowLoad: addMenu,
     onMainWindowUnload() {},
     onPreferencesLoad(win: Window) {
+        const settings: Array<[string, string, string]> = [
+            ["retainpdf-paddle-token", "paddleToken", ""],
+            ["retainpdf-ai-base-url", "aiBaseURL", ""],
+            ["retainpdf-ai-model", "aiModel", ""],
+            ["retainpdf-ai-key", "aiAPIKey", ""],
+            ["retainpdf-target-language", "targetLanguage", "zh"],
+            ["retainpdf-engine-mode", "engineMode", "desktop"],
+            ["retainpdf-page-ranges", "pageRanges", ""],
+            ["retainpdf-max-concurrency", "maxConcurrency", "1"],
+        ];
+        for (const [id, name, fallback] of settings) {
+            const input = win.document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+            if (!input) continue;
+            if (!input.dataset.retainpdfBound) {
+                input.value = String(Zotero.Prefs.get(`${config.prefsPrefix}.${name}`, true) || fallback);
+                input.dataset.retainpdfBound = "true";
+                input.addEventListener("change", () => Zotero.Prefs.set(`${config.prefsPrefix}.${name}`, input.value, true));
+            }
+        }
         void refreshEngineStatus(win);
         const button = win.document.getElementById("retainpdf-install-engine") as HTMLButtonElement | null;
         if (!button || button.dataset.retainpdfBound) return;

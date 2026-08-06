@@ -13,6 +13,7 @@ const defaults = {
     aiBaseURL: "",
     aiModel: "",
     aiAPIKey: "",
+    paddleToken: "",
     targetLanguage: "zh",
     engineMode: "desktop",
     pageRanges: "",
@@ -135,7 +136,11 @@ export class RetainPDFClient {
         for (let attempt = 0; attempt < 720; attempt++) {
             const job = await this.api<Job>(`/jobs/${encodeURIComponent(jobID)}`);
             if (job.status === "succeeded") return job;
-            if (["failed", "cancelled"].includes(job.status)) throw new Error(`RetainPDF 任务失败：${job.stage || job.status}`);
+            if (["failed", "cancelled"].includes(job.status)) {
+                const diagnostic = (job as Job & { error?: string; failure?: { root_cause?: string; summary?: string } }).failure;
+                const reason = diagnostic?.root_cause || diagnostic?.summary || (job as Job & { error?: string }).error;
+                throw new Error(`RetainPDF 任务失败：${reason || job.stage || job.status}`);
+            }
             if (job.stage && job.stage !== lastStage) {
                 lastStage = job.stage;
                 const stage = /ocr|extract|parse/i.test(job.stage) ? "解析/OCR" : /render|compile/i.test(job.stage) ? "渲染" : "翻译";
@@ -196,6 +201,7 @@ export class RetainPDFClient {
         const template = JSON.parse(pref("jobTemplate"));
         const configuredPageRanges = pref("pageRanges");
         if (configuredPageRanges) template.ocr = { ...template.ocr, page_ranges: configuredPageRanges };
+        if (pref("paddleToken")) template.ocr = { ...template.ocr, provider: "paddle", paddle_token: pref("paddleToken") };
         // The v2 settings page owns API credentials. Keep the v1 template as a
         // fallback during the migration to the bundled local engine.
         if (pref("aiBaseURL")) template.translation = { ...template.translation, base_url: pref("aiBaseURL") };

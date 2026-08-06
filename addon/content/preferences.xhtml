@@ -7,7 +7,12 @@
   </html:style>
   <vbox id="retainpdf-v2-settings" flex="1">
     <html:h2>RetainPDF 翻译</html:h2>
-    <html:p class="hint">第二版开发设置。当前使用第一版本地引擎；后续将自动切换为无界面的内置本地引擎。</html:p>
+    <html:p class="hint">所有凭证仅保存在本机 Zotero 配置中；无需使用高级设置编辑器。</html:p>
+
+    <html:h3>OCR 服务</html:h3>
+    <html:label for="retainpdf-paddle-token">Paddle API Token</html:label>
+    <html:input id="retainpdf-paddle-token" preference="extensions.zotero.retainpdfzotero.paddleToken" type="password" placeholder="从 PaddleOCR 服务获取的 Token" />
+    <html:p class="hint">用于 PDF 版面识别和公式/图片提取。留空时才兼容读取旧版高级设置中的 Token。</html:p>
 
     <html:h3>AI 翻译服务</html:h3>
     <html:label for="retainpdf-ai-base-url">兼容 OpenAI 的接口地址</html:label>
