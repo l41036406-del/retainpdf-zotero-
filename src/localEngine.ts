@@ -18,9 +18,7 @@ const ENGINE_AI_PORT = 41101;
 const ENGINE_API_KEY = "retainpdf-zotero-local";
 // Alpha builds must use an explicit release tag so stable users never download
 // a preview engine through the `latest` release alias.
-const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/retainpdf-zotero-/releases/download/v2.0.0-alpha.1/retainpdf-zotero-engine-win32.zip";
-
-declare const Subprocess: any;
+const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/retainpdf-zotero-/releases/download/v2.0.0-alpha.2/retainpdf-zotero-engine-win32.zip";
 
 export type LocalEngineStatus =
     | { ready: true; baseURL: string }
@@ -115,14 +113,19 @@ export class LocalEngineManager {
             RETAIN_PDF_TITLE_BOLD_FONT_PATH: PathUtils.join(this.runtimeRoot, "fonts", "SourceHanSerifSC-Bold.otf"),
         };
 
-        // Subprocess keeps running after the returned promise is stored. We do
-        // not await its completion: the engine is intentionally long-lived.
-        void Subprocess.call({
-            command: this.executable,
-            arguments: [],
-            workdir: this.runtimeRoot,
-            environment,
-        }).catch((error: unknown) => Zotero.debug(`RetainPDF local engine exited: ${String(error)}`));
+        // `Subprocess` is not exported to every Zotero add-on context. Use the
+        // native XPCOM process service, which is also used by the desktop-mode
+        // compatibility path. nsIProcess inherits this environment at launch.
+        const classes = Components.classes as any;
+        const processEnv = classes["@mozilla.org/process/environment;1"].getService(
+            Components.interfaces.nsIEnvironment,
+        );
+        for (const [name, value] of Object.entries(environment)) processEnv.set(name, value);
+        const executable = classes["@mozilla.org/file/local;1"].createInstance(Components.interfaces.nsIFile);
+        executable.initWithPath(this.executable);
+        const process = classes["@mozilla.org/process/util;1"].createInstance(Components.interfaces.nsIProcess);
+        process.init(executable);
+        process.run(false, [], 0);
 
         for (let attempt = 0; attempt < 30; attempt++) {
             await sleep(1000);
