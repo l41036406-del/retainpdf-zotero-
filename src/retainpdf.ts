@@ -1,5 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { config } from "../package.json";
+import { ProgressReporter } from "./progress";
 
 export type OutputKind = "translated" | "bilingual";
 type ApiResponse<T> = { code: number; message: string; data: T };
@@ -9,6 +10,13 @@ const defaults = {
     baseURL: "http://127.0.0.1:41000",
     apiKey: "",
     desktopExePath: "D:\\retainpdf\\RetainPDF.exe",
+    aiBaseURL: "",
+    aiModel: "",
+    aiAPIKey: "",
+    targetLanguage: "zh",
+    engineMode: "desktop",
+    pageRanges: "",
+    maxConcurrency: "1",
     jobTemplate: JSON.stringify({
         workflow: "book",
         ocr: { provider: "paddle", language: "ch", page_ranges: "" },
@@ -117,11 +125,17 @@ export class RetainPDFClient {
         return body.data;
     }
 
-    private async waitForJob(jobID: string): Promise<Job> {
+    private async waitForJob(jobID: string, report?: ProgressReporter): Promise<Job> {
+        let lastStage = "";
         for (let attempt = 0; attempt < 720; attempt++) {
             const job = await this.api<Job>(`/jobs/${encodeURIComponent(jobID)}`);
             if (job.status === "succeeded") return job;
             if (["failed", "cancelled"].includes(job.status)) throw new Error(`RetainPDF 任务失败：${job.stage || job.status}`);
+            if (job.stage && job.stage !== lastStage) {
+                lastStage = job.stage;
+                const stage = /ocr|extract|parse/i.test(job.stage) ? "解析/OCR" : /render|compile/i.test(job.stage) ? "渲染" : "翻译";
+                report?.(stage, job.stage, stage === "翻译" ? 55 : stage === "渲染" ? 85 : 30);
+            }
             await sleep(5000);
         }
         throw new Error("等待 RetainPDF 任务超时。");
@@ -168,16 +182,28 @@ export class RetainPDFClient {
         });
     }
 
-    async translateAndAttach(item: Zotero.Item, kind: OutputKind): Promise<void> {
+    async translateAndAttach(item: Zotero.Item, kind: OutputKind, report?: ProgressReporter): Promise<void> {
+        report?.("准备", "检查本地 PDF", 5);
         await this.ensureDesktopRunning();
         const attachment = await this.attachmentFor(item);
+        report?.("上传", PathUtils.filename(attachment.getFilePath() || "PDF"), 15);
         const uploaded = await this.upload(attachment);
         const template = JSON.parse(pref("jobTemplate"));
+        const configuredPageRanges = pref("pageRanges");
+        if (configuredPageRanges) template.ocr = { ...template.ocr, page_ranges: configuredPageRanges };
+        // The v2 settings page owns API credentials. Keep the v1 template as a
+        // fallback during the migration to the bundled local engine.
+        if (pref("aiBaseURL")) template.translation = { ...template.translation, base_url: pref("aiBaseURL") };
+        if (pref("aiModel")) template.translation = { ...template.translation, model: pref("aiModel") };
+        if (pref("aiAPIKey")) template.translation = { ...template.translation, api_key: pref("aiAPIKey") };
         const submitted = await this.api<{ job_id: string }>("/jobs", { method: "POST", headers: this.headers(), body: JSON.stringify({ ...template, source: { upload_id: uploaded.upload_id } }) });
-        await this.waitForJob(submitted.job_id);
+        report?.("解析/OCR", "任务已提交", 25);
+        await this.waitForJob(submitted.job_id, report);
+        report?.("渲染", "下载译文 PDF", 90);
         const translated = await this.download(`/jobs/${encodeURIComponent(submitted.job_id)}/pdf`);
         const sourcePath = attachment.getFilePath();
         if (!sourcePath) throw new Error("PDF 附件文件不存在于本地。");
+        report?.("写入 Zotero", kind === "translated" ? "生成译文版附件" : "生成双语版附件", 95);
         if (kind === "translated") {
             await this.attach(attachment, translated, "译文版-PDF");
         } else {
@@ -191,5 +217,6 @@ export class RetainPDFClient {
         // Zotero imports a managed copy before this point. Only delete the
         // RetainPDF book after its corresponding attachment is safely saved.
         await this.deleteRemoteBook(submitted.job_id);
+        report?.("完成", "已清理本地翻译任务", 100);
     }
 }

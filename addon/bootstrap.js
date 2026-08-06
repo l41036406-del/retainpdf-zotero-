@@ -12,6 +12,7 @@ async function startup({ resourceURI, rootURI }) {
     const ctx = { rootURI };
     ctx._globalThis = ctx;
     Services.scriptloader.loadSubScript(`${rootURI}content/scripts/__addonRef__.js`, ctx);
+    Zotero.__addonInstance__.rootURI = rootURI;
     await Zotero.__addonInstance__.hooks.onStartup();
 }
 async function onMainWindowLoad({ window }) { Zotero.__addonInstance__?.hooks.onMainWindowLoad(window); }

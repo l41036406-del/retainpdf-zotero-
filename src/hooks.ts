@@ -1,4 +1,6 @@
 import { RetainPDFClient, OutputKind } from "./retainpdf";
+import { TranslationProgressWindow } from "./progress";
+import { config } from "../package.json";
 
 const MENU_ID = "zotero-itemmenu-retainpdf-zotero";
 
@@ -9,20 +11,21 @@ function selectedItems(): Zotero.Item[] {
 }
 
 async function run(kind: OutputKind) {
+    const progress = new TranslationProgressWindow();
     try {
         const items = selectedItems();
         if (!items.length) {
             throw new Error("请先选择一个文献条目或 PDF 附件。");
         }
         const client = new RetainPDFClient();
-        for (const item of items) await client.translateAndAttach(item, kind);
-        Services.prompt.alert(
-            Zotero.getMainWindow() as unknown as mozIDOMWindowProxy,
-            "RetainPDF",
-            "任务已提交。翻译完成后会自动作为子附件添加到原文献。",
-        );
+        for (let index = 0; index < items.length; index++) {
+            progress.report("准备", `队列任务 ${index + 1}/${items.length}`, 0);
+            await client.translateAndAttach(items[index], kind, progress.report);
+        }
+        progress.succeed("翻译完成，PDF 已写入 Zotero");
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        progress.fail(message);
         Services.prompt.alert(
             Zotero.getMainWindow() as unknown as mozIDOMWindowProxy,
             "RetainPDF 翻译失败",
@@ -49,9 +52,20 @@ function addMenu(win: Window) {
     itemMenu.appendChild(menu);
 }
 
+function registerPreferences() {
+    const addon = (Zotero as any)[config.addonInstance];
+    if (!addon?.rootURI) return;
+    Zotero.PreferencePanes.register({
+        pluginID: config.addonID,
+        src: `${addon.rootURI}content/preferences.xhtml`,
+        label: "RetainPDF 翻译",
+    });
+}
+
 export default {
     async onStartup() {
         await Promise.all([Zotero.initializationPromise, Zotero.uiReadyPromise]);
+        registerPreferences();
         Zotero.getMainWindows().forEach(addMenu);
     },
     onMainWindowLoad: addMenu,
