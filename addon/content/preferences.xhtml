@@ -1,4 +1,4 @@
-<groupbox>
+<groupbox onload="Zotero.__addonInstance__.hooks.onPreferencesLoad(window);">
   <html:style>
     #retainpdf-v2-settings { max-width: 760px; }
     #retainpdf-v2-settings h3 { margin: 8px 0 4px; }
@@ -28,9 +28,11 @@
     <html:label for="retainpdf-engine-mode">运行模式</html:label>
     <html:select id="retainpdf-engine-mode" preference="extensions.zotero.retainpdfzotero.engineMode">
       <html:option value="desktop">兼容模式：已安装的 RetainPDF 桌面引擎</html:option>
-      <html:option value="bundled" disabled="disabled">内置本地引擎（第二版开发中）</html:option>
+      <html:option value="bundled">内置本地引擎（无需桌面版）</html:option>
     </html:select>
-    <html:p class="hint">内置引擎将不显示桌面界面，并在插件调用时自动启动。该运行时仍在第二版开发中。</html:p>
+    <html:button id="retainpdf-install-engine">安装/检查内置本地引擎</html:button>
+    <html:p id="retainpdf-engine-status" class="hint">正在检查内置本地引擎…</html:p>
+    <html:p class="hint">首次安装会下载约 165 MB 的 Windows 引擎包，解压后完全在本机运行；以后翻译无需打开 RetainPDF 桌面版。</html:p>
 
     <html:h3>任务默认值</html:h3>
     <html:label for="retainpdf-page-ranges">页码范围（留空为全文）</html:label>

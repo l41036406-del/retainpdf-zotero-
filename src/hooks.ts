@@ -74,6 +74,12 @@ function registerPreferences() {
     });
 }
 
+async function refreshEngineStatus(win: Window) {
+    const status = await new LocalEngineManager().status();
+    const label = win.document.getElementById("retainpdf-engine-status");
+    if (label) label.textContent = status.ready ? "内置本地引擎已就绪。" : status.reason;
+}
+
 export default {
     async onStartup() {
         await Promise.all([Zotero.initializationPromise, Zotero.uiReadyPromise]);
@@ -82,6 +88,28 @@ export default {
     },
     onMainWindowLoad: addMenu,
     onMainWindowUnload() {},
+    onPreferencesLoad(win: Window) {
+        void refreshEngineStatus(win);
+        const button = win.document.getElementById("retainpdf-install-engine") as HTMLButtonElement | null;
+        if (!button || button.dataset.retainpdfBound) return;
+        button.dataset.retainpdfBound = "true";
+        button.addEventListener("click", () => void (async () => {
+            button.disabled = true;
+            button.textContent = "正在安装本地引擎…";
+            try {
+                await new LocalEngineManager().ensureReady();
+                Zotero.Prefs.set(`${config.prefsPrefix}.engineMode`, "bundled", true);
+                await refreshEngineStatus(win);
+                button.textContent = "内置本地引擎已安装";
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                const label = win.document.getElementById("retainpdf-engine-status");
+                if (label) label.textContent = `安装失败：${message}`;
+                button.textContent = "重试安装内置本地引擎";
+                button.disabled = false;
+            }
+        })());
+    },
     onShutdown() {
         Zotero.getMainWindows().forEach((win) => win.document.getElementById(MENU_ID)?.remove());
         delete (Zotero as any).retainPDFZotero;
