@@ -134,9 +134,8 @@ export class RetainPDFClient {
         const translated = await this.download(`/jobs/${encodeURIComponent(submitted.job_id)}/pdf`);
         const sourcePath = attachment.getFilePath();
         if (!sourcePath) throw new Error("PDF 附件文件不存在于本地。");
-        const stem = PathUtils.filename(sourcePath).replace(/\.pdf$/i, "");
-        if (kind === "translated") return this.attach(attachment, translated, `${stem} - 译文.pdf`);
+        if (kind === "translated") return this.attach(attachment, translated, "译文版-PDF");
         const source = await IOUtils.read(sourcePath);
-        return this.attach(attachment, await this.bilingual(source, translated), `${stem} - 双语对照.pdf`);
+        return this.attach(attachment, await this.bilingual(source, translated), "双语版-PDF");
     }
 }
