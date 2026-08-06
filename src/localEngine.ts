@@ -16,10 +16,10 @@ const ENGINE_PORT = 41001;
 const ENGINE_SIMPLE_PORT = 42001;
 const ENGINE_AI_PORT = 41101;
 const ENGINE_API_KEY = "retainpdf-zotero-local";
-const ENGINE_VERSION = "2.0.0-alpha.4";
+const ENGINE_VERSION = "2.0.0";
 // Alpha builds must use an explicit release tag so stable users never download
 // a preview engine through the `latest` release alias.
-const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/retainpdf-zotero-/releases/download/v2.0.0-alpha.4/retainpdf-zotero-engine-win32.zip";
+const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/RetainPDF-Zotero/releases/download/v2.0.0/retainpdf-zotero-engine-win32.zip";
 
 export type LocalEngineStatus =
     | { ready: true; baseURL: string }
@@ -41,7 +41,9 @@ export class LocalEngineManager {
     }
 
     get runtimeRoot() {
-        return PathUtils.join(PathUtils.profileDir, "retainpdf-zotero", "engine");
+        // Keep each engine in a versioned folder. Windows may retain a handle
+        // on an old rust_api.exe, so replacing it in place is unreliable.
+        return PathUtils.join(PathUtils.profileDir, "retainpdf-zotero", `engine-${ENGINE_VERSION}`);
     }
 
     private get executable() {
@@ -155,13 +157,6 @@ export class LocalEngineManager {
         }
         await IOUtils.write(this.archivePath, new Uint8Array(await response.arrayBuffer()));
         try {
-            if (await IOUtils.exists(this.runtimeRoot)) {
-                try {
-                    await IOUtils.remove(this.runtimeRoot, { recursive: true });
-                } catch (_error) {
-                    throw new Error("无法替换旧引擎。请先关闭旧引擎的终端窗口，再点击此按钮重试。");
-                }
-            }
             await IOUtils.makeDirectory(this.runtimeRoot, { ignoreExisting: true });
             const classes = Components.classes as any;
             const file = classes["@mozilla.org/file/local;1"].createInstance(Components.interfaces.nsIFile);
