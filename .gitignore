@@ -1,0 +1,6 @@
+node_modules/
+build/
+.env
+.scaffold
+reference-zotero-pdf2zh/
+reference-retain-pdf/

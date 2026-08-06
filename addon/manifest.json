@@ -1,0 +1,14 @@
+{
+  "manifest_version": 2,
+  "name": "__addonName__",
+  "version": "__buildVersion__",
+  "description": "Translate PDF attachments through a local RetainPDF service.",
+  "applications": {
+    "zotero": {
+      "id": "__addonID__",
+      "update_url": "__updateURL__",
+      "strict_min_version": "9.0",
+      "strict_max_version": "9.*"
+    }
+  }
+}

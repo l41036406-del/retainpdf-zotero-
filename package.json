@@ -1,0 +1,28 @@
+{
+  "name": "retainpdf-zotero",
+  "version": "0.1.0",
+  "description": "A minimal Zotero 9 bridge for the local RetainPDF service.",
+  "config": {
+    "addonName": "RetainPDF for Zotero",
+    "addonID": "retainpdf-zotero@local",
+    "addonRef": "retainpdfzotero",
+    "addonInstance": "retainPDFZotero",
+    "prefsPrefix": "extensions.zotero.retainpdfzotero"
+  },
+  "repository": { "type": "git", "url": "https://github.com/{{owner}}/retainpdf-zotero.git" },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc --noEmit && zotero-plugin build",
+    "start": "zotero-plugin serve"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "zotero-plugin-toolkit": "^5.1.0-beta.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "zotero-plugin-scaffold": "^0.3.2",
+    "zotero-types": "^4.1.0-beta.4"
+  }
+}
