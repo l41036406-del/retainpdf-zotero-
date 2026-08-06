@@ -8,9 +8,9 @@ export default defineConfig({
     id: pkg.config.addonID,
     namespace: pkg.config.addonRef,
     updateURL:
-        "https://github.com/{{owner}}/retainpdf-zotero/releases/download/release/update.json",
+        "https://github.com/l41036406-del/retainpdf-zotero插件/releases/download/release/update.json",
     xpiDownloadLink:
-        "https://github.com/{{owner}}/retainpdf-zotero/releases/download/v{{version}}/{{xpiName}}.xpi",
+        "https://github.com/l41036406-del/retainpdf-zotero插件/releases/download/v{{version}}/{{xpiName}}.xpi",
     build: {
         assets: ["addon/**/*.*"],
         define: { ...pkg.config, buildVersion: pkg.version },

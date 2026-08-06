@@ -9,7 +9,7 @@
     "addonInstance": "retainPDFZotero",
     "prefsPrefix": "extensions.zotero.retainpdfzotero"
   },
-  "repository": { "type": "git", "url": "https://github.com/{{owner}}/retainpdf-zotero.git" },
+  "repository": { "type": "git", "url": "https://github.com/l41036406-del/retainpdf-zotero插件.git" },
   "license": "MIT",
   "scripts": {
     "build": "tsc --noEmit && zotero-plugin build",
