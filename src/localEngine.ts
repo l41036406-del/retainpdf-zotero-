@@ -16,6 +16,7 @@ const ENGINE_PORT = 41001;
 const ENGINE_SIMPLE_PORT = 42001;
 const ENGINE_AI_PORT = 41101;
 const ENGINE_API_KEY = "retainpdf-zotero-local";
+const ENGINE_ARCHIVE_URL = "https://github.com/l41036406-del/retainpdf-zotero-/releases/latest/download/retainpdf-zotero-engine-win32.zip";
 
 declare const Subprocess: any;
 
@@ -54,6 +55,10 @@ export class LocalEngineManager {
         return PathUtils.join(PathUtils.profileDir, "retainpdf-zotero", "data");
     }
 
+    private get archivePath() {
+        return PathUtils.join(PathUtils.tempDir, "retainpdf-zotero-engine-win32.zip");
+    }
+
     async status(): Promise<LocalEngineStatus> {
         if (!await IOUtils.exists(this.executable)) {
             return { ready: false, reason: "未安装内置本地引擎。" };
@@ -72,9 +77,7 @@ export class LocalEngineManager {
     async ensureReady(): Promise<{ baseURL: string; apiKey: string }> {
         const current = await this.status();
         if (current.ready) return { baseURL: current.baseURL, apiKey: this.apiKey };
-        if (!await IOUtils.exists(this.executable)) {
-            throw new Error("内置本地引擎尚未安装。请在 RetainPDF 设置中安装引擎后重试。");
-        }
+        if (!await IOUtils.exists(this.executable)) await this.install();
         if (!this.starting) this.starting = this.start();
         await this.starting;
         return { baseURL: this.baseURL, apiKey: this.apiKey };
@@ -92,11 +95,22 @@ export class LocalEngineManager {
             RUST_API_PROJECT_ROOT: this.runtimeRoot,
             RUST_API_SCRIPTS_DIR: this.scriptsDir,
             RUST_API_AI_SERVICE_BASE: `http://127.0.0.1:${ENGINE_AI_PORT}`,
+            PYTHON_BIN: PathUtils.join(this.runtimeRoot, "python", "python.exe"),
+            PYTHONHOME: PathUtils.join(this.runtimeRoot, "python"),
+            PYTHONPATH: [
+                this.scriptsDir,
+                PathUtils.join(this.runtimeRoot, "ai_service"),
+                PathUtils.join(this.runtimeRoot, "python", "Lib", "site-packages"),
+            ].join(";"),
             PYTHONUTF8: "1",
             PYTHONUNBUFFERED: "1",
             PYTHONDONTWRITEBYTECODE: "1",
             RETAIN_PDF_TYPST_FONT_DIRS: PathUtils.join(this.runtimeRoot, "fonts"),
             TYPST_BIN: PathUtils.join(this.runtimeRoot, "typst", "bin", "typst.exe"),
+            TYPST_PACKAGE_PATH: PathUtils.join(this.runtimeRoot, "typst-packages"),
+            TYPST_PACKAGE_CACHE_PATH: PathUtils.join(this.dataRoot, "typst-package-cache"),
+            RETAIN_PDF_FONT_PATH: PathUtils.join(this.runtimeRoot, "fonts", "SourceHanSerifSC-Regular.otf"),
+            RETAIN_PDF_TITLE_BOLD_FONT_PATH: PathUtils.join(this.runtimeRoot, "fonts", "SourceHanSerifSC-Bold.otf"),
         };
 
         // Subprocess keeps running after the returned promise is stored. We do
@@ -114,5 +128,48 @@ export class LocalEngineManager {
             if (status.ready) return;
         }
         throw new Error("内置本地引擎启动超时。请在设置中查看运行时诊断信息。");
+    }
+
+    private async install(): Promise<void> {
+        const response = await fetch(ENGINE_ARCHIVE_URL);
+        if (!response.ok) {
+            throw new Error(`下载内置本地引擎失败（${response.status}）。请检查网络后重试。`);
+        }
+        await IOUtils.write(this.archivePath, new Uint8Array(await response.arrayBuffer()));
+        try {
+            await IOUtils.makeDirectory(this.runtimeRoot, { ignoreExisting: true });
+            const classes = Components.classes as any;
+            const file = classes["@mozilla.org/file/local;1"].createInstance(Components.interfaces.nsIFile);
+            file.initWithPath(this.archivePath);
+            const zip = classes["@mozilla.org/libjar/zip-reader;1"].createInstance(Components.interfaces.nsIZipReader);
+            const ensureDirectory = (directory: any): void => {
+                if (directory.exists()) return;
+                ensureDirectory(directory.parent);
+                directory.create(Components.interfaces.nsIFile.DIRECTORY_TYPE, 0o755);
+            };
+            zip.open(file);
+            try {
+                const entries = zip.findEntries(null);
+                while (entries.hasMore()) {
+                    const entryName = String(entries.getNext());
+                    if (entryName.includes("..") || entryName.startsWith("/") || entryName.startsWith("\\")) {
+                        throw new Error("内置本地引擎压缩包包含不安全路径。");
+                    }
+                    if (entryName.endsWith("/")) continue;
+                    const output = classes["@mozilla.org/file/local;1"].createInstance(Components.interfaces.nsIFile);
+                    output.initWithPath(this.runtimeRoot);
+                    for (const component of entryName.split("/")) output.append(component);
+                    ensureDirectory(output.parent);
+                    zip.extract(entryName, output);
+                }
+            } finally {
+                zip.close();
+            }
+        } finally {
+            await IOUtils.remove(this.archivePath, { ignoreAbsent: true });
+        }
+        if (!await IOUtils.exists(this.executable)) {
+            throw new Error("内置本地引擎安装不完整，未找到 Rust API。请重新安装。 ");
+        }
     }
 }
