@@ -45,7 +45,10 @@ export class RetainPDFClient {
     }
 
     private async api<T>(path: string, init: RequestInit = {}): Promise<T> {
-        const response = await fetch(`${this.baseURL}/api/v1${path}`, init);
+        const response = await fetch(`${this.baseURL}/api/v1${path}`, {
+            ...init,
+            headers: { ...this.headers(false), ...(init.headers || {}) },
+        });
         const body = await response.json() as unknown as ApiResponse<T>;
         if (!response.ok || body.code !== 0) throw new Error(body.message || `RetainPDF 请求失败 (${response.status})`);
         return body.data;
