@@ -1,16 +1,18 @@
 # RetainPDF for Zotero
 
-面向 **Zotero 9** 的精简插件。当前仅维护 **v0.1.6**；请勿使用此前的历史发行版。
+面向 **Zotero 9** 的精简插件。当前仅维护 **v0.1.8**；请勿使用此前的历史发行版。
 
 ## 使用条件
 
-- 必须先启动并保持 **RetainPDF 桌面版**运行。
+- 使用时需要安装 **RetainPDF 桌面版**。插件会在本机服务未启动时自动打开它，并等待服务就绪后继续任务。
 - 该插件通过本机服务 `http://127.0.0.1:41000` 提交任务；不支持独立运行，也不支持远程 RetainPDF 服务。
 
 在条目或 PDF 附件的右键菜单中只有两项：
 
 - **生成译文 PDF**：完成后自动回写为子附件，标题为“译文版-PDF”。
 - **生成双语对照 PDF**：原文左、译文右；完成后自动回写为子附件，标题为“双语版-PDF”。
+
+在成功回写 Zotero 后，插件会自动删除 RetainPDF 桌面版中对应的书籍、任务和产物；Zotero 中的原始 PDF 与新生成附件会保留。
 
 双语对照文件仅在本机生成；不会将文献上传到 RetainPDF 以外的服务。
 
@@ -20,6 +22,7 @@
 
 - `extensions.zotero.retainpdfzotero.baseURL`
 - `extensions.zotero.retainpdfzotero.apiKey`（桌面版可填 `retain-pdf-desktop`）
+- `extensions.zotero.retainpdfzotero.desktopExePath`（默认 `D:\\retainpdf\\RetainPDF.exe`；桌面版安装在其他位置时修改此项）
 - `extensions.zotero.retainpdfzotero.jobTemplate`（RetainPDF grouped job JSON，填入你的 OCR/模型配置）
 
 ## Build

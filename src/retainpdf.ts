@@ -8,6 +8,7 @@ type Job = { job_id: string; status: string; stage?: string; artifacts?: { outpu
 const defaults = {
     baseURL: "http://127.0.0.1:41000",
     apiKey: "",
+    desktopExePath: "D:\\retainpdf\\RetainPDF.exe",
     jobTemplate: JSON.stringify({
         workflow: "book",
         ocr: { provider: "paddle", language: "ch", page_ranges: "" },
@@ -27,6 +28,7 @@ function sleep(ms: number) { return new Promise<void>((resolve) => setTimeout(re
 export class RetainPDFClient {
     private baseURL = pref("baseURL").replace(/\/$/, "");
     private apiKey = pref("apiKey");
+    private desktopExePath = pref("desktopExePath");
 
     private get effectiveApiKey(): string {
         // The official desktop app exposes its loopback Rust API with this key.
@@ -42,6 +44,41 @@ export class RetainPDFClient {
             ...(json ? { "Content-Type": "application/json" } : {}),
             ...(this.effectiveApiKey ? { "X-API-Key": this.effectiveApiKey } : {}),
         };
+    }
+
+    private get isLocalDesktop(): boolean {
+        return /^http:\/\/(127\.0\.0\.1|localhost):41000$/i.test(this.baseURL);
+    }
+
+    private async desktopIsReady(): Promise<boolean> {
+        try {
+            const response = await fetch(`${this.baseURL}/health`, { headers: this.headers(false) });
+            return response.ok;
+        } catch (_error) {
+            return false;
+        }
+    }
+
+    private async startDesktop(): Promise<void> {
+        if (!this.desktopExePath || !await IOUtils.exists(this.desktopExePath)) {
+            throw new Error(`未找到 RetainPDF 桌面版：${this.desktopExePath || "未配置路径"}。请在高级配置中设置 extensions.zotero.retainpdfzotero.desktopExePath。`);
+        }
+        const classes = Components.classes as any;
+        const executable = classes["@mozilla.org/file/local;1"].createInstance(Components.interfaces.nsIFile);
+        executable.initWithPath(this.desktopExePath);
+        const process = classes["@mozilla.org/process/util;1"].createInstance(Components.interfaces.nsIProcess);
+        process.init(executable);
+        process.run(false, [], 0);
+    }
+
+    private async ensureDesktopRunning(): Promise<void> {
+        if (!this.isLocalDesktop || await this.desktopIsReady()) return;
+        await this.startDesktop();
+        for (let attempt = 0; attempt < 30; attempt++) {
+            await sleep(2000);
+            if (await this.desktopIsReady()) return;
+        }
+        throw new Error("RetainPDF 桌面版已尝试启动，但 60 秒内未准备就绪。请检查桌面版是否显示启动错误。");
     }
 
     private async api<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -125,7 +162,14 @@ export class RetainPDFClient {
         } finally { await IOUtils.remove(file); }
     }
 
+    private async deleteRemoteBook(jobID: string): Promise<void> {
+        await this.api<void>(`/library/books/${encodeURIComponent(jobID)}`, {
+            method: "DELETE",
+        });
+    }
+
     async translateAndAttach(item: Zotero.Item, kind: OutputKind): Promise<void> {
+        await this.ensureDesktopRunning();
         const attachment = await this.attachmentFor(item);
         const uploaded = await this.upload(attachment);
         const template = JSON.parse(pref("jobTemplate"));
@@ -134,8 +178,18 @@ export class RetainPDFClient {
         const translated = await this.download(`/jobs/${encodeURIComponent(submitted.job_id)}/pdf`);
         const sourcePath = attachment.getFilePath();
         if (!sourcePath) throw new Error("PDF 附件文件不存在于本地。");
-        if (kind === "translated") return this.attach(attachment, translated, "译文版-PDF");
-        const source = await IOUtils.read(sourcePath);
-        return this.attach(attachment, await this.bilingual(source, translated), "双语版-PDF");
+        if (kind === "translated") {
+            await this.attach(attachment, translated, "译文版-PDF");
+        } else {
+            const source = await IOUtils.read(sourcePath);
+            await this.attach(
+                attachment,
+                await this.bilingual(source, translated),
+                "双语版-PDF",
+            );
+        }
+        // Zotero imports a managed copy before this point. Only delete the
+        // RetainPDF book after its corresponding attachment is safely saved.
+        await this.deleteRemoteBook(submitted.job_id);
     }
 }
