@@ -97,8 +97,10 @@ export class RetainPDFClient {
     }
 
     private async bilingual(source: Uint8Array, translated: Uint8Array): Promise<Uint8Array> {
-        const original = await PDFDocument.load(source);
-        const translation = await PDFDocument.load(translated);
+        // IOUtils and fetch can yield typed arrays from different Firefox
+        // compartments. pdf-lib requires an array owned by this add-on realm.
+        const original = await PDFDocument.load(Uint8Array.from(source));
+        const translation = await PDFDocument.load(Uint8Array.from(translated));
         if (original.getPageCount() !== translation.getPageCount()) throw new Error("原文与译文页数不同，无法生成逐页双语对照版。");
         const output = await PDFDocument.create();
         for (let index = 0; index < original.getPageCount(); index++) {
