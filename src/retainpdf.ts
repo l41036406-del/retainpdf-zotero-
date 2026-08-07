@@ -2,6 +2,16 @@ import { PDFDocument } from "pdf-lib";
 import { config } from "../package.json";
 
 export type OutputKind = "translated" | "bilingual";
+export type PendingJob = {
+    jobID: string;
+    itemKey: string;
+    libraryID: number;
+    kind: OutputKind;
+};
+export type JobLifecycle = {
+    submitted?: (job: PendingJob) => void | Promise<void>;
+    completed?: (jobID: string) => void | Promise<void>;
+};
 type ApiResponse<T> = { code: number; message: string; data: T };
 type Job = { job_id: string; status: string; stage?: string; artifacts?: { output_pdf?: { ready?: boolean } } };
 
@@ -153,7 +163,19 @@ export class RetainPDFClient {
         return await output.save();
     }
 
+    private hasAttachment(source: Zotero.Item, title: string): boolean {
+        const parentItemID = source.isAttachment() ? source.parentItemID : source.id;
+        const parent = parentItemID ? Zotero.Items.get(parentItemID) as any : null;
+        if (!parent) return false;
+        return parent.getAttachments().some((id: number) => {
+            const attachment = Zotero.Items.get(id) as any;
+            return attachment && attachment.getField("title") === title;
+        });
+    }
+
     private async attach(source: Zotero.Item, bytes: Uint8Array, title: string): Promise<void> {
+        // Recovery can retry after Zotero restarts. Avoid creating duplicates.
+        if (this.hasAttachment(source, title)) return;
         const file = PathUtils.join(PathUtils.tempDir, `${Date.now()}-${title}`);
         await IOUtils.write(file, bytes);
         try {
@@ -168,28 +190,37 @@ export class RetainPDFClient {
         });
     }
 
-    async translateAndAttach(item: Zotero.Item, kind: OutputKind): Promise<void> {
-        await this.ensureDesktopRunning();
+    private async attachCompleted(item: Zotero.Item, kind: OutputKind, jobID: string): Promise<void> {
         const attachment = await this.attachmentFor(item);
-        const uploaded = await this.upload(attachment);
-        const template = JSON.parse(pref("jobTemplate"));
-        const submitted = await this.api<{ job_id: string }>("/jobs", { method: "POST", headers: this.headers(), body: JSON.stringify({ ...template, source: { upload_id: uploaded.upload_id } }) });
-        await this.waitForJob(submitted.job_id);
-        const translated = await this.download(`/jobs/${encodeURIComponent(submitted.job_id)}/pdf`);
+        const translated = await this.download(`/jobs/${encodeURIComponent(jobID)}/pdf`);
         const sourcePath = attachment.getFilePath();
         if (!sourcePath) throw new Error("PDF 附件文件不存在于本地。");
         if (kind === "translated") {
             await this.attach(attachment, translated, "译文版-PDF");
         } else {
             const source = await IOUtils.read(sourcePath);
-            await this.attach(
-                attachment,
-                await this.bilingual(source, translated),
-                "双语版-PDF",
-            );
+            await this.attach(attachment, await this.bilingual(source, translated), "双语版-PDF");
         }
-        // Zotero imports a managed copy before this point. Only delete the
-        // RetainPDF book after its corresponding attachment is safely saved.
-        await this.deleteRemoteBook(submitted.job_id);
+        // This is deliberately last: a failed Zotero write-back must retain
+        // the desktop book so the persistent queue can recover it later.
+        await this.deleteRemoteBook(jobID);
+    }
+
+    async resumeAndAttach(item: Zotero.Item, pending: PendingJob): Promise<void> {
+        await this.ensureDesktopRunning();
+        await this.waitForJob(pending.jobID);
+        await this.attachCompleted(item, pending.kind, pending.jobID);
+    }
+
+    async translateAndAttach(item: Zotero.Item, kind: OutputKind, lifecycle?: JobLifecycle): Promise<void> {
+        await this.ensureDesktopRunning();
+        const attachment = await this.attachmentFor(item);
+        const uploaded = await this.upload(attachment);
+        const template = JSON.parse(pref("jobTemplate"));
+        const submitted = await this.api<{ job_id: string }>("/jobs", { method: "POST", headers: this.headers(), body: JSON.stringify({ ...template, source: { upload_id: uploaded.upload_id } }) });
+        await lifecycle?.submitted?.({ jobID: submitted.job_id, itemKey: item.key, libraryID: item.libraryID, kind });
+        await this.waitForJob(submitted.job_id);
+        await this.attachCompleted(item, kind, submitted.job_id);
+        await lifecycle?.completed?.(submitted.job_id);
     }
 }

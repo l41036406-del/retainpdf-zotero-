@@ -2,13 +2,14 @@
 
 RetainPDF for Zotero 是一个面向 **Zotero 9** 的本地翻译插件。它将 PDF 发送给本机已安装的 RetainPDF 桌面版处理，再将结果回写为 Zotero 子附件。
 
-正式第一版：**v1.0.0**。
+维护版：**v1.0.1**（基于正式第一版）。
 
 ## 功能
 
 - 右键菜单只提供两项：**生成译文 PDF** 与 **生成双语对照 PDF**。
 - RetainPDF 桌面版未运行时，自动启动桌面版并最多等待 60 秒。
-- 译文成功导入 Zotero 后，自动清理 RetainPDF 桌面版中的对应书籍、任务和产物。
+- 每个已提交任务会先保存到 Zotero 首选项；即使 Zotero 关闭、崩溃或插件重载，下次启动也会自动恢复回传。
+- 只有译文成功导入 Zotero 后，才自动清理 RetainPDF 桌面版中的对应书籍、任务和产物。
 - Zotero 中保留原始 PDF，以及名称为“译文版-PDF”或“双语版-PDF”的输出附件。
 
 双语对照版在本机合成：原文在左、译文在右。插件不会连接远程 RetainPDF 服务。
@@ -26,7 +27,7 @@ RetainPDF for Zotero 是一个面向 **Zotero 9** 的本地翻译插件。它将
 
 ## 安装插件
 
-1. 在 [Releases](https://github.com/l41036406-del/retainpdf-zotero-/releases) 下载 `retain-pdf-for-zotero.xpi`。
+1. 在 [Releases](https://github.com/l41036406-del/RetainPDF-Zotero/releases) 下载 `retain-pdf-for-zotero.xpi`。
 2. 在 Zotero 中打开 **工具 → 插件**。
 3. 点击右上角齿轮，选择“从文件安装插件…”，选择下载的 XPI。
 4. 重启 Zotero。
@@ -81,7 +82,9 @@ RetainPDF for Zotero 是一个面向 **Zotero 9** 的本地翻译插件。它将
 1. 在 Zotero 中选中一个文献条目，或直接选中它的 PDF 附件。
 2. 右键选择 **生成译文 PDF** 或 **生成双语对照 PDF**。
 3. 插件会在 RetainPDF 不在运行时自行启动它，完成后把 PDF 回写为 Zotero 子附件。
-4. 回写成功后，RetainPDF 桌面版库中对应书籍会被删除；文献只保留在 Zotero。
+4. 回写成功后，RetainPDF 桌面版库中对应书籍、任务及产物会被删除；文献只保留在 Zotero。
+
+如果 Zotero 在任务运行或回传时关闭，重新打开 Zotero 即会从保存的任务记录继续等待、写回并清理。若任务失败、PDF 无法导入或条目已被删除，任务记录和 RetainPDF 数据会保留，避免提前丢失结果。
 
 若提示未找到桌面版，请检查 `desktopExePath` 是否指向真实的 `RetainPDF.exe`。若提示服务 60 秒内未就绪，请直接启动 RetainPDF 桌面版并检查其启动错误。
 
